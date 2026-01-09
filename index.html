@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paste & Save Image</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    h1 { margin-bottom: 0.5rem; }
+    .subtitle { color: #888; margin-bottom: 2rem; }
+    #dropzone {
+      border: 2px dashed #444;
+      border-radius: 12px;
+      padding: 3rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #dropzone:hover, #dropzone.active {
+      border-color: #666;
+      background: #222;
+    }
+    #dropzone.has-image {
+      padding: 1rem;
+    }
+    #preview {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 8px;
+      display: none;
+    }
+    #preview.visible { display: block; margin: 1rem auto; }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
+      display: none;
+    }
+    button.visible { display: inline-block; }
+    button:hover { background: #1d4ed8; }
+    .info { font-size: 0.875rem; color: #666; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>Paste & Save</h1>
+  <p class="subtitle">100% local. Nothing leaves your browser.</p>
+  
+  <div id="dropzone">
+    <p>Paste an image here (Ctrl+V / Cmd+V)</p>
+    <p style="color: #666; font-size: 0.875rem;">or click to select a file</p>
+    <input type="file" id="fileInput" accept="image/*" hidden>
+    <img id="preview">
+  </div>
+  
+  <button id="saveBtn">Save Image...</button>
+  
+  <p class="info">Uses the File System Access API — works in Chrome, Edge, and other Chromium browsers.</p>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const preview = document.getElementById('preview');
+    const saveBtn = document.getElementById('saveBtn');
+    const fileInput = document.getElementById('fileInput');
+    
+    let currentBlob = null;
+    let currentType = 'image/png';
+
+    // Paste handler
+    document.addEventListener('paste', async (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          await loadImage(file);
+          break;
+        }
+      }
+    });
+
+    // Click to select file
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      if (e.target.files[0]) {
+        await loadImage(e.target.files[0]);
+      }
+    });
+
+    async function loadImage(file) {
+      currentBlob = file;
+      currentType = file.type || 'image/png';
+      
+      const url = URL.createObjectURL(file);
+      preview.src = url;
+      preview.classList.add('visible');
+      saveBtn.classList.add('visible');
+      dropzone.classList.add('has-image');
+    }
+
+    // Save handler
+    saveBtn.addEventListener('click', async () => {
+      if (!currentBlob) return;
+      
+      const ext = currentType.split('/')[1] || 'png';
+      
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `image.${ext}`,
+          types: [{
+            description: 'Image',
+            accept: { [currentType]: [`.${ext}`] }
+          }]
+        });
+        
+        const writable = await handle.createWritable();
+        await writable.write(currentBlob);
+        await writable.close();
+        
+        alert('Saved!');
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          alert('Save failed: ' + err.message);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
