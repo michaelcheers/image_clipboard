@@ -87,7 +87,7 @@
       for (const item of items) {
         if (item.type.startsWith('image/')) {
           const file = item.getAsFile();
-          await loadImage(file);
+          await loadImage(file, true);
           break;
         }
       }
@@ -101,7 +101,7 @@
       }
     });
 
-    async function loadImage(file) {
+    async function loadImage(file, autoSave = false) {
       currentBlob = file;
       currentType = file.type || 'image/png';
       
@@ -110,6 +110,10 @@
       preview.classList.add('visible');
       saveBtn.classList.add('visible');
       dropzone.classList.add('has-image');
+      
+      if (autoSave) {
+        saveBtn.click();
+      }
     }
 
     // Save handler
@@ -118,26 +122,36 @@
       
       const ext = currentType.split('/')[1] || 'png';
       
-      try {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: `image.${ext}`,
-          types: [{
-            description: 'Image',
-            accept: { [currentType]: [`.${ext}`] }
-          }]
-        });
-        
-        const writable = await handle.createWritable();
-        await writable.write(currentBlob);
-        await writable.close();
-        
-        alert('Saved!');
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error(err);
-          alert('Save failed: ' + err.message);
+      // Try native file picker first (Chromium + secure context)
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: `image.${ext}`,
+            types: [{
+              description: 'Image',
+              accept: { [currentType]: [`.${ext}`] }
+            }]
+          });
+          
+          const writable = await handle.createWritable();
+          await writable.write(currentBlob);
+          await writable.close();
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn('showSaveFilePicker failed, falling back:', err);
         }
       }
+      
+      // Fallback: classic download
+      const url = URL.createObjectURL(currentBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `image.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     });
   </script>
 </body>
